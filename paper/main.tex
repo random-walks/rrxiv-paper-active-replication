@@ -4,11 +4,19 @@
 \rrxivprotocolversion{0.1.0}
 \rrxivlicense{CC-BY-4.0}
 \rrxivtopics{cs.DL,cs.IR}
-\rrxivbuilddate{2026-05-25}
+\rrxivbuilddate{2026-07-14}
 
 \title{Many small claims, all under active replication}
-\author{Blaise Albis-Burdige \and Claude Opus 4.7}
-\date{2026-05-25}
+% Structured author records (RRP-0021/0025/0026) — mirror rrxiv-meta.json.
+\rrxivauthor[orcid=0009-0002-0561-6499, role=author,
+  affiliation=Random Walks,
+  email=albisburdige@protonmail.com]{Blaise Albis-Burdige}
+\rrxivauthor[role=agent, is-agent=true, handle=agent:claude-opus-4.7,
+  model-name=Claude Opus 4.7, model-vendor=anthropic,
+  model-family=claude, model-series=opus, model-version=4.7,
+  model-release-pin=claude-opus-4-7-20260520,
+  inference-environment=Claude Code CLI]{Claude Opus 4.7}
+\date{2026-07-14}
 
 \begin{document}
 \maketitle
@@ -19,55 +27,67 @@ Demonstration paper in the rrxiv reference corpus. The canonical machine-readabl
 \end{center}
 
 \begin{abstract}
-A preprint's claims are not a homogeneous block; they age, replicate, and fail at different rates. We argue that the natural unit of replication is the individual claim, and we encode that argument operationally: every numbered claim below carries a structured \texttt{active\_replication} annotation naming the replicating team, the start timestamp, and an expected-completion date. From an instrumentation run of the rrxiv reference instance ($n{=}312$ preprint--replication pairs across 14 months), pre-registering a replication target on a claim shifts median completion forward by approximately six weeks against a matched unregistered baseline. The paper is therefore both a substantive measurement of registration's effect on replication latency, and the canonical worked example of the \texttt{active-replication} pattern: it self-references its own annotations as evidence.
+A preprint's claims are not a homogeneous block; they age, replicate, and fail at different rates. We argue that the natural unit of replication is the individual claim, and we encode that argument operationally: every numbered claim below has an active-replication pre-registration --- naming a replication window, an expected-completion date, and a methodology summary --- carried as a \texttt{comment} annotation posted to the live rrxiv instance against the claim's stable identifier (queryable via \texttt{GET /annotations?target\_id=rrxiv:2605.00008:claim:cN}). Annotations are post-submission discourse: they live on the instance and attach to claim IDs; they are not baked into the paper's build-time CIR sidecar. The seven annotation documents are also versioned in this paper's source repository (\texttt{annotations/}). From an instrumentation dataset styled as a run of a reference instance ($n{=}312$ preprint--replication pairs across 14 months --- a constructed worked example, per the scope note in section~\ref{sec:approach}), pre-registering a replication target on a claim shifts median completion forward by approximately six weeks against a matched unregistered baseline. The paper is therefore both a worked measurement of registration's effect on replication latency, and the canonical worked example of the active-replication pattern: it self-references its own annotations as the existence proof.
 \end{abstract}
 
 \section{Introduction}
 \label{sec:intro}
 Most replication infrastructure treats a preprint as the unit of replication: someone announces that they will ``replicate the paper'', usually on a personal homepage or in a tweet, sometimes a year after publication, and there is no canonical place to find that announcement again. This framing has two costs. First, replication completion times are bimodal and very long-tailed --- a non-trivial fraction of announced replications never resolve, and there is no way for a funder to distinguish ``in progress'' from ``abandoned'' without writing email. Second, the whole-paper framing hides which \emph{claim} is actually under test. A paper with eight empirical claims that has one widely replicated headline result is not the same epistemic object as one with eight independently tested claims; current bibliographic infrastructure cannot tell those apart.
 
-The rrxiv protocol \citep{rrxiv-whitepaper} pushes the unit of replication down one level: each claim has a stable identifier (\texttt{<paper\_id>:claim:<label>}), and annotations attach to that identifier, not to the paper. This paper exercises that affordance. We define a small annotation schema, \texttt{active\_replication}, with six fields --- target claim, replication team, start timestamp, expected completion date, methodology summary, and code repository --- and we post one such annotation per claim in this paper before publication. The annotations are visible in the CIR sidecar, queryable from the rrxiv API, and, critically, dated: a third party can compute, at any later moment, whether the registered expected-completion date has slipped and by how much.
+The rrxiv protocol \citep{rrxiv-whitepaper} pushes the unit of replication down one level: each claim has a stable identifier (\texttt{<id\_slug>:claim:<label>}), and annotations attach to that identifier, not to the paper. This paper exercises that affordance. We define a small pre-registration \emph{convention}, active-replication, with six fields --- target claim, registering identity, start timestamp, expected completion date, methodology summary, and code repository --- and we post one such registration per claim in this paper. Protocol honesty note: annotation.schema.json v0.1 has a closed twelve-type \texttt{annotation\_type} enum, and \texttt{active\_replication} is not one of them; a pre-registration also has no outcome yet, so the \texttt{replication} type (whose payload requires an \texttt{outcome}) would be wrong. The registration is therefore carried as a \texttt{comment} annotation whose content holds the six fields, and completion is reported by a follow-up \texttt{replication} annotation with a structured payload. The registrations are queryable from the rrxiv API and, critically, dated: a third party can compute, at any later moment, whether the registered expected-completion date has slipped and by how much.
 
-The substantive contribution is an estimate of the registration effect itself. Across $n{=}312$ replication attempts logged in the rrxiv reference instance between 2025-03 and 2026-05, claims with a pre-registered \texttt{active\_replication} annotation reached the ``replication\_complete'' state at a median 41 days earlier than matched unregistered attempts on comparable claims. We report the estimate, the matching procedure, the residual confounds, and the open question of what happens when a registered team disappears.
+The substantive contribution is an estimate of the registration effect itself. Across $n{=}312$ replication attempts logged in the rrxiv reference instance between 2025-03 and 2026-05, claims with a pre-registered active-replication annotation reached completion (a posted \texttt{replication} annotation) at a median 41 days earlier than matched unregistered attempts on comparable claims. We report the estimate, the matching procedure, the residual confounds, and the open question of what happens when a registered team disappears.
 
-The roadmap. Section \ref{sec:background} situates the pattern relative to existing claim-graph and preprint infrastructure. Section \ref{sec:approach} describes the annotation schema, the matching procedure, and the measurement window. Section \ref{sec:claims} states each of seven registered claims, with the actual \texttt{active\_replication} annotation reproduced inline as an existence-proof of the pattern. Section \ref{sec:discussion} discusses what registration does and does not buy, including the abandonment-risk open question.
+The roadmap. Section \ref{sec:background} situates the pattern relative to existing claim-graph and preprint infrastructure. Section \ref{sec:approach} describes the annotation schema, the matching procedure, and the measurement window. Section \ref{sec:claims} states each of seven registered claims, with the actual registration annotations reproduced inline as an existence-proof of the pattern. Section \ref{sec:discussion} discusses what registration does and does not buy, including the abandonment-risk open question.
 
 \section{Background}
 \label{sec:background}
 This work sits at the intersection of three threads. The claim-graph thread \citep[\texttt{rrxiv:2605.00002}]{rrxiv-claimgraph} argues that the unit of citation, replication, and contradiction should be the individual claim, not the paper. The reproducibility-budget thread \citep[\texttt{rrxiv:2605.00003}]{rrxiv-repro-budgets} attaches per-paper compute/data signals so that ``reproducible'' becomes a measurable annotation rather than a binary label. The replication-latency thread, with which this paper engages directly, has historically been studied in coarse aggregate \citep{camerer-2018,errington-2021}: how many announced replications resolve, on what timescale, and with what concordance to the original. The contribution here is to instrument the latency question at the claim-annotation layer, where the relevant signals (registration, methodology, code link) are already structured.
 
-Pre-registration has a deep literature in psychology and clinical trials and is widely credited with reducing publication bias and selective reporting \citep{nosek-2018}. Pre-registering a \emph{replication} is rarer, partly because there has historically been no canonical surface for the announcement to attach to. The \texttt{active-replication} annotation pattern fills exactly that gap: it provides the surface, with timestamps, on the claim itself.
+Pre-registration has a deep literature in psychology and clinical trials and is widely credited with reducing publication bias and selective reporting \citep{nosek-2018}. Pre-registering a \emph{replication} is rarer, partly because there has historically been no canonical surface for the announcement to attach to. The active-replication annotation pattern fills exactly that gap: it provides the surface, with timestamps, on the claim itself.
 
 A note on scope. We are not arguing that registration causes faster science --- only that it shifts median completion forward in a regime where the alternative is an unsurfaced personal commitment. The mechanism is mundane: a registered date is visible to collaborators, to funders, and to the team themselves, and slips are observable. The size of the effect, and its dependence on team composition and topic, is what this paper measures.
 
 \section{Approach}
 \label{sec:approach}
-\subsection{The \texttt{active\_replication} annotation}
-The annotation is a JSON document attached to a claim ID. Its schema is intentionally minimal:
+\subsection{The active-replication registration}
+\label{sec:registration-shape}
+The registration is a real protocol object: an annotation document conforming to \texttt{annotation.schema.json} v0.1, with \texttt{annotation\_type: comment} and the six registration fields carried in the annotation's content. A representative registration (this paper's own, on claim \ref{claim:c1}) looks like:
 
 \begin{verbatim}
 {
-  "kind": "active_replication",
-  "target_claim": "rrxiv:2605.00004:claim:c2",
-  "replication_team": ["orcid:0000-0002-1825-0097", ...],
-  "started_at": "2026-04-18T00:00:00Z",
-  "expected_completion_at": "2026-09-30",
-  "methodology_summary": "Resample n=200 ML preprints, re-run the
-     shrinkage estimator from sec 3 against held-out 2025-Q4 data.",
-  "code_repo": "https://github.com/rrxiv-replicators/c2-shrinkage"
+  "id": "ann-ar-2605-00008-c1",
+  "target_id": "rrxiv:2605.00008:claim:c1",
+  "target_type": "claim",
+  "annotation_type": "comment",
+  "content": "Active-replication pre-registration ...
+     started_at: 2026-05-01T09:00:00Z
+     expected_completion_at: 2026-07-15
+     methodology_summary: Re-extract the title-length
+        feature on an independent geo mirror of the
+        access log; re-fit the discontinuity at w=12. ...",
+  "created_at": "2026-07-14T00:00:00Z",
+  "created_by": { "identity_type": "orcid",
+                  "identity": "0009-0002-0561-6499" }
 }
 \end{verbatim}
 
-The annotation is posted via the rrxiv API and surfaces both in the paper's CIR sidecar and in the per-claim view. The two timestamp fields --- \texttt{started\_at} and \texttt{expected\_completion\_at} --- are the load-bearing ones for the measurement reported in claim \ref{claim:c7}. A replication is considered ``complete'' when the team posts a follow-up annotation of kind \texttt{replication\_result} (success, partial, or contradicted) on the same target claim.
+Why \texttt{comment} and not a dedicated type? The v0.1 protocol's \texttt{annotation\_type} enum is closed (twelve types), and a pre-registration has no \texttt{outcome} yet, so it cannot honestly be a \texttt{replication} annotation --- that type's structured payload requires an outcome in \{\texttt{supports}, \texttt{contradicts}, \texttt{partial}, \texttt{inconclusive}\} (spec/0006, RRP-0019). The \texttt{comment} type is the protocol's sanctioned catch-all, and per spec its \texttt{structured\_payload} must be null, which is why the registration fields ride in \texttt{content}. Promoting active-replication to a first-class annotation type with a structured payload is a candidate future RRP; this paper is the motivating worked example.
+
+The annotation is posted via the rrxiv API (\texttt{POST /annotations}) and surfaces in the per-claim annotation listing (\texttt{GET /annotations?target\_id=<claim-id>\&target\_type=claim}). It does \emph{not} appear in the paper's CIR sidecar: the CIR is a build-time artifact of the submission, while annotations are post-submission discourse held by the instance. The two timestamp fields --- \texttt{started\_at} and \texttt{expected\_completion\_at} --- are the load-bearing ones for the measurement reported in claim \ref{claim:c7}. A replication is considered ``complete'' when the team posts a follow-up \texttt{replication} annotation on the same target claim, whose structured payload carries the outcome and method; the server derives the claim's \texttt{replication\_status} from accumulated replication annotations (RRP-0019).
 
 \subsection{Matching and identification strategy}
-For the estimate underlying claim \ref{claim:c7}, we observe $n{=}312$ replication attempts in the rrxiv reference instance over 14 months. Of these, 184 carried an \texttt{active\_replication} annotation before the work began and 128 did not (the latter were detected after the fact by parsing follow-up \texttt{replication\_result} annotations and back-dating). We match each unregistered replication to a registered one on (a) the topic tags of the target claim, (b) the claim's evidence type, and (c) the number of inbound \texttt{depends\_on} edges on the target claim. Median completion time is then compared on the matched cohort.
+A scope note first, for honesty: this is a demonstration paper in the rrxiv reference corpus, and the instrumentation dataset below is a \emph{constructed worked example} of the analysis --- the live instance (deployed 2026-05) is younger than the 14-month observation window described, so no real deployment could have produced it. The numbers exercise the pattern and the analysis pipeline; treat them as illustrative, not as field data.
+
+For the estimate underlying claim \ref{claim:c7}, we observe $n{=}312$ replication attempts in the rrxiv reference instance over 14 months. Of these, 184 carried an active-replication registration before the work began and 128 did not (the latter were detected after the fact by parsing follow-up \texttt{replication} annotations and back-dating). We match each unregistered replication to a registered one on (a) the topic tags of the target claim, (b) the claim's evidence type, and (c) the number of inbound \texttt{depends\_on} edges on the target claim. Median completion time is then compared on the matched cohort.
 
 The matched cohort gives a median delta of $-41$ days for registered attempts, with a bootstrap 95\% interval of $[-58, -23]$ days. The headline figure ``six weeks'' rounds the point estimate. We do not claim a causal effect; the natural confounder is self-selection (teams who register may be more organised in general). Section \ref{sec:discussion} addresses this directly.
 
 \subsection{This paper's own annotations}
 \label{sec:own-annotations}
-Each of the seven claims in section \ref{sec:claims} below has an \texttt{active\_replication} annotation posted at submission time. Table \ref{tab:registry} summarises the registry. Concrete annotations are shown alongside claims \ref{claim:c1} and \ref{claim:c5} as worked examples; the others follow the same shape.
+Each of the seven claims in section \ref{sec:claims} below has an active-replication registration --- a \texttt{comment} annotation in the shape of section \ref{sec:registration-shape} --- posted to the live instance against its claim ID, and versioned in this paper's source repository under \texttt{annotations/}. Table \ref{tab:registry} summarises the registry. Concrete annotation documents are shown alongside claims \ref{claim:c1} and \ref{claim:c5} as worked examples; the others follow the same shape.
+
+Registry honesty. The ``replicating team'' handles in Table \ref{tab:registry} are \emph{illustrative}: no external team has committed to these replications. The registrations are posted by this paper's own authors as reference-corpus demonstrations of the pattern, and each annotation's content says so explicitly. All seven claims accordingly carry the server-derived \texttt{replication\_status: untested} --- the status is derived from \texttt{replication} annotations (RRP-0019), none of which exist yet, and nothing in this paper overrides it.
 
 \begin{table}[h]
 \centering
@@ -76,7 +96,7 @@ Each of the seven claims in section \ref{sec:claims} below has an \texttt{active
 \toprule
 Claim & Replicating team (handle) & Started & Expected \\
 \midrule
-\ref{claim:c1}* & \texttt{title-length-group@tuebingen} & 2026-05-01 & 2026-07-15 \\
+\ref{claim:c1} & \texttt{title-length-group@tuebingen} & 2026-05-01 & 2026-07-15 \\
 \ref{claim:c2} & \texttt{search-ctr-coop} & 2026-05-04 & 2026-08-20 \\
 \ref{claim:c3} & \texttt{citation-network-lab@ut} & 2026-05-10 & 2026-10-01 \\
 \ref{claim:c4} & \texttt{ir-eval-collective} & 2026-05-12 & 2026-08-30 \\
@@ -85,7 +105,7 @@ Claim & Replicating team (handle) & Started & Expected \\
 \ref{claim:c7} & \texttt{rrxiv-instance-internal} & 2026-05-20 & 2026-12-31 \\
 \bottomrule
 \end{tabular}
-\caption{The seven claims of this paper, each registered for active replication at submission. {\itshape * c1 carries ``Replication status: replicated'' from an earlier independent attempt; the entry above registers a second independent replication on the T\"ubingen geo mirror, which is the pattern when a corpus wants more than one cross-check on a load-bearing finding.}}
+\caption{The seven claims of this paper, each with an active-replication registration. {\itshape Worked example: the team handles and dates are illustrative --- no external team has committed to these replications, and the registrations are posted by the paper's own authors as demonstrations of the pattern (section \ref{sec:own-annotations}). All seven claims are \texttt{replication\_status: untested} on the live instance.}}
 \label{tab:registry}
 \end{table}
 
@@ -95,98 +115,78 @@ This is the ``double duty'' framing: claim \ref{claim:c7} is the substantive emp
 \label{sec:claims}
 
 \subsection*{Claim 1: title length and cross-domain attention}
-\begin{claim}[Claim 1]
+\begin{claim}[type=empirical, evidence=observation, confidence=0.7, rationale={Regression discontinuity in a constructed access-log demonstration dataset; robust breakpoint but observational and illustrative}, labels={worked-example, access-log}, title={Title length and cross-domain attention}]
 \label{claim:c1}
 Preprint titles longer than 12 words receive 18\% less cross-domain attention (median, n=4{,}800 papers).
-
-\emph{Replication status: replicated.}
 \end{claim}
 
 The signal here is robust because the title-length feature is cheap to extract and the outcome (cross-domain reads, defined as a read by a user whose declared primary topic differs from the paper's primary topic) is logged at the rrxiv access tier. The 12-word threshold is not magic; it is the breakpoint at which a regression discontinuity emerges in the access log. Below 12 words, cross-domain attention scales roughly linearly with abstract specificity; above 12 words, an additional title word predicts a 1.5\% drop in cross-domain reads on average.
 
-The annotation registered against this claim, as posted on 2026-05-01, is:
+The registration against this claim is the annotation document shown in full in section \ref{sec:registration-shape}; the source file is \texttt{annotations/active-replication.c1.json} in this paper's repository. Its content block carries the registration fields:
 
 \begin{verbatim}
-{ "kind": "active_replication",
-  "target_claim": "rrxiv:2605.00008:claim:c1",
-  "replication_team": ["orcid:0000-0001-7821-3344"],
-  "started_at": "2026-05-01T09:00:00Z",
-  "expected_completion_at": "2026-07-15",
-  "methodology_summary": "Re-extract title-length feature on the
-     Tubingen mirror of the rrxiv access log (different geo
-     distribution); re-fit the discontinuity at w=12.",
-  "code_repo": "https://github.com/title-length-group/c1-redo" }
+team_handle: title-length-group@tuebingen (illustrative)
+started_at: 2026-05-01T09:00:00Z
+expected_completion_at: 2026-07-15
+methodology_summary: Re-extract the title-length feature on
+   an independent geo mirror of the rrxiv access log
+   (different geo distribution); re-fit the discontinuity
+   at w=12.
 \end{verbatim}
 
 \subsection*{Claim 2: structured abstracts and click-through}
-\begin{claim}[Claim 2]
+\begin{claim}[type=empirical, evidence=experiment, confidence=0.6, rationale={Within-paper v1-vs-v2 A/B on a constructed demonstration dataset; correlational framing kept deliberately}, labels={worked-example, discoverability}, title={Structured abstracts and click-through}]
 \label{claim:c2}
 Adding a structured abstract correlates with 22\% higher click-through from search results.
-
-\emph{Replication status: untested.}
 \end{claim}
 
 This claim depends on the title-length result --- both regress an attention outcome on a surface feature of the paper, and the title-length cohort is used as a control variable when estimating the structured-abstract effect. We list a \texttt{depends\_on} edge accordingly. The 22\% figure is from a within-paper A/B (papers that added a structured abstract in a v2 revision, compared against their own v1), and is robust to dropping the bottom decile of papers by access count.
 
 \subsection*{Claim 3: in-subfield citation concentration}
-\begin{claim}[Claim 3]
+\begin{claim}[type=empirical, evidence=observation, confidence=0.55, rationale={Ratio against a topic-uniform null on the demonstration citation graph; sensitive to the null model choice}, labels={worked-example, citation-graph}, title={In-subfield citation concentration}]
 \label{claim:c3}
 Domain experts cite within their own subfield 4x more than cross-domain.
-
-\emph{Replication status: untested.}
 \end{claim}
 
 The 4x figure is the ratio of within-subfield citations to expected cross-domain citations under a topic-uniform null. It depends on the discoverability story: the same titling and structured-abstract decisions that suppress cross-domain reads (claims \ref{claim:c1} and \ref{claim:c2}) plausibly drive the in-subfield concentration of citations downstream. The replication will independently measure citations on the topic-tagged citation graph and is expected to converge or contradict by 2026-10.
 
 \subsection*{Claim 4: section-level retrieval}
-\begin{claim}[Claim 4]
+\begin{claim}[type=computational, evidence=experiment, confidence=0.7, rationale={Cleanest IR benchmark in the bundle, but run on one embedding model; the registered replication tests model dependence}, labels={worked-example, retrieval}, title={Section-level retrieval}]
 \label{claim:c4}
 Section-level retrieval beats whole-paper retrieval on recall@5 for narrow technical queries.
-
-\emph{Replication status: untested.}
 \end{claim}
 
 This is the cleanest IR claim in the bundle. Section embeddings are computed off the parsed CIR (one embedding per \texttt{\textbackslash section}); whole-paper embeddings are computed off concatenated text. The recall@5 gap is largest for queries phrased as a single dense technical term (e.g.\ ``Krippendorff alpha'' or ``Cramer--Rao bound''); for diffuse multi-concept queries, the gap closes. The independent replication will run on a different embedding model (the original used \texttt{rrxiv-embed-v3}; the replicators will use the public \texttt{instructor-xl}) to test for model dependence.
 
 \subsection*{Claim 5: reproducibility-budget signal stability}
-\begin{claim}[Claim 5]
+\begin{claim}[type=methodological, evidence=experiment, confidence=0.75, rationale={Three reannotation rounds with alpha robust to dropping the most experienced annotator; small annotator pool}, labels={worked-example, inter-annotator}, title={Reproducibility-budget signal stability}]
 \label{claim:c5}
 The reproducibility-budget signal is stable across three independent reannotation rounds (Krippendorff's alpha = 0.79).
-
-\emph{Replication status: untested.}
 \end{claim}
 
-This claim sits on top of the reproducibility-budget construct introduced in \texttt{rrxiv:2605.00003}; the inter-annotator agreement is the kind of signal-stability check that determines whether the budget is a usable feature in downstream models. $\alpha = 0.79$ is at the high end of ``substantial'' agreement on the Krippendorff scale and is robust to dropping the most experienced annotator from each round. The annotation registered against this claim, posted on 2026-05-15, is:
+This claim sits on top of the reproducibility-budget construct introduced in \texttt{rrxiv:2605.00003}; the inter-annotator agreement is the kind of signal-stability check that determines whether the budget is a usable feature in downstream models. $\alpha = 0.79$ is at the high end of ``substantial'' agreement on the Krippendorff scale and is robust to dropping the most experienced annotator from each round. The registration against this claim (\texttt{annotations/active-replication.c5.json}, posted as a \texttt{comment} annotation per section \ref{sec:registration-shape}) carries in its content:
 
 \begin{verbatim}
-{ "kind": "active_replication",
-  "target_claim": "rrxiv:2605.00008:claim:c5",
-  "replication_team": ["orcid:0000-0003-1122-4455",
-                       "orcid:0000-0002-9988-1010"],
-  "started_at": "2026-05-15T00:00:00Z",
-  "expected_completion_at": "2026-09-10",
-  "methodology_summary": "Recruit 4 new annotators (no overlap
-     with original 3); re-run the budget-tagging protocol on
-     the same 120-paper sample; recompute alpha.",
-  "code_repo": "https://github.com/repro-budget-rereaders/c5" }
+team_handle: repro-budget-rereaders (illustrative)
+started_at: 2026-05-15T00:00:00Z
+expected_completion_at: 2026-09-10
+methodology_summary: Recruit 4 new annotators (no overlap
+   with original 3); re-run the budget-tagging protocol on
+   the same 120-paper sample; recompute alpha.
 \end{verbatim}
 
 \subsection*{Claim 6: ORCID coverage and deduplication}
-\begin{claim}[Claim 6]
+\begin{claim}[type=empirical, evidence=observation, confidence=0.6, rationale={Empirical threshold from dedup error decomposition on the demonstration corpus; the exact 70 percent figure is corpus-dependent}, labels={worked-example, identity}, title={ORCID coverage and deduplication}]
 \label{claim:c6}
 Author ORCID coverage above 70\% is necessary (but not sufficient) for accurate cross-paper deduplication.
-
-\emph{Replication status: untested.}
 \end{claim}
 
 The 70\% threshold is empirical: below it, name-collision rates dominate the dedup error budget; above it, ORCID-anchored matching plateaus and the residual error comes from name-only entries and from authors who hold multiple ORCIDs. The ``necessary but not sufficient'' qualifier matters: a paper with 100\% ORCID coverage still inherits its co-authors' lower-coverage records, so dedup quality is bounded by the worst neighbour.
 
 \subsection*{Claim 7: the registration effect itself}
-\begin{claim}[Claim 7]
+\begin{claim}[type=empirical, evidence=observation, confidence=0.6, rationale={Matched observational cohort with bootstrap interval excluding zero, but self-selection confound acknowledged and the dataset is a constructed worked example}, labels={worked-example, load-bearing, registration-effect}, title={The registration effect itself}]
 \label{claim:c7}
 Pre-registering a replication target shifts the median completion time forward by 6 weeks vs unregistered replications.
-
-\emph{Replication status: untested.}
 \end{claim}
 
 This is the substantive claim of the paper. The point estimate (41 days, rounded to six weeks) is derived from the matched cohort described in section \ref{sec:approach}; the bootstrap 95\% interval is $[-58, -23]$ days. It depends on claim \ref{claim:c5}'s annotator-stability finding because the matching procedure relies on the reproducibility-budget tag as one of the matching covariates, and a wobbly tag would inflate the variance of the estimate. The internal replication \texttt{rrxiv-instance-internal} will redo the analysis with a different matching radius (loosening the topic-tag constraint from exact to one-step-removed in the topic taxonomy) and report by 2026-12-31.
@@ -209,9 +209,9 @@ The proximate mechanism is unsurprising: a registered date is observable, and sl
 \label{sec:discussion}
 The six-week shift is large enough to matter operationally. For a funder running a replication-funding tranche, the difference between ``median completion in 4 months'' and ``median completion in 5.5 months'' is the difference between budget cycles. For a journal editor deciding whether to wait on a replication before issuing a correction, the same shift can determine whether the correction is in this volume or the next. The shift is not, however, large enough to wave away the selection-confound: teams that register may simply be the teams that finish.
 
-What the registration buys with high confidence, and where the selection-confound bites less, is \emph{visibility}. Whether or not registered replications are faster on average, they are findable: the rrxiv API exposes a stable endpoint \texttt{/claims/<id>/active\_replications}, and a funder can query it directly. This converts the question ``what is being replicated right now?'' from a literature-search problem into a database query. The instance-internal replication of claim \ref{claim:c7} (Table \ref{tab:registry}, row 7) will, by design, test whether the visibility effect is separable from the latency effect.
+What the registration buys with high confidence, and where the selection-confound bites less, is \emph{visibility}. Whether or not registered replications are faster on average, they are findable: the rrxiv API exposes the per-claim annotation listing \texttt{GET /annotations?target\_id=<claim-id>\&target\_type=claim}, and a funder can query it directly. This converts the question ``what is being replicated right now?'' from a literature-search problem into a database query. The instance-internal replication of claim \ref{claim:c7} (Table \ref{tab:registry}, row 7) will, by design, test whether the visibility effect is separable from the latency effect.
 
-A scope note. We are not arguing that every claim should be replicated, or that the volume of replication is the bottleneck. Many claims do not warrant the cost. The \texttt{active\_replication} annotation is a coordination affordance, not a mandate; it makes replication legible when someone chooses to do it.
+A scope note. We are not arguing that every claim should be replicated, or that the volume of replication is the bottleneck. Many claims do not warrant the cost. The active-replication registration is a coordination affordance, not a mandate; it makes replication legible when someone chooses to do it.
 
 \begin{scope}[What this paper does not cover]
 We do not address (a) the replication-quality question --- a registered, on-time replication can still be methodologically weak; (b) the question of who is allowed to mark a replication ``complete'' --- the current convention is the registering team's self-report, which is auditable but not adjudicated; or (c) the meta-replication of claim \ref{claim:c7} itself across different rrxiv instances. The third is on the roadmap once a second instance is live.
