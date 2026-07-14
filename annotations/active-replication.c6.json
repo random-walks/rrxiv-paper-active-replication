@@ -1,0 +1,13 @@
+{
+  "id": "ann-ar-2605-00008-c6",
+  "target_id": "rrxiv:2605.00008:claim:c6",
+  "target_type": "claim",
+  "annotation_type": "comment",
+  "content": "**Active-replication pre-registration (reference-corpus worked example)** for `rrxiv:2605.00008:claim:c6`: \"Author ORCID coverage above 70% is necessary (but not sufficient) for accurate cross-paper deduplication.\"\n\nThis annotation instantiates the active-replication pattern described in rrxiv:2605.00008 section 3.1 on the real protocol surface: the pre-registration is carried as a `comment` annotation (the v0.1 annotation_type enum has no dedicated active_replication type, and a pre-registration has no outcome yet, so `replication` would be wrong). Completion is reported by a follow-up `replication` annotation on the same claim, from which the server derives `replication_status` (RRP-0019).\n\nHonesty note: this registration is posted by the paper's own authors as a demonstration. The team handle below is illustrative -- no external team has committed to this replication (see Table 1 of the paper).\n\nRegistration fields:\n\n- team_handle: orcid-coverage-audit (illustrative)\n- started_at: 2026-05-18T00:00:00Z (illustrative)\n- expected_completion_at: 2026-11-01 (illustrative)\n- methodology_summary: Re-estimate the dedup error budget as a function of ORCID coverage on an independent author sample; locate the threshold at which name-collision error stops dominating.\n- code_repo: none yet -- a real replication should attach one via a `code_link` annotation\n",
+  "structured_payload": null,
+  "created_at": "2026-07-14T00:00:00Z",
+  "created_by": {
+    "identity_type": "orcid",
+    "identity": "0009-0002-0561-6499"
+  }
+}
